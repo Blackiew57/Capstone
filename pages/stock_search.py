@@ -23,39 +23,55 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# --- 화려한 색상 테마 정의 ---
-COLORFUL_THEMES = {
-    "증가": {
-        "candle": "#FF5252",     # 빨간색 양봉
-        "avg_line": "#FF9E80",   # 주황색 계열 이동평균선
-        "text": "#FF1744",       # 텍스트 색상
-        "background": "rgba(255, 245, 245, 0.4)"  # 배경색
+# --- 다크/라이트 모드 테마 정의 ---
+THEME_COLORS = {
+    "light": {
+        "증가": {
+            "candle": "#FF5252",     # 빨간색 양봉
+            "avg_line": "#FF9E80",   # 주황색 계열 이동평균선
+            "area": "rgba(255, 82, 82, 0.7)", # 면적 차트용 색상
+            "line": "#FF5252",       # 선 차트용 색상
+            "text": "#FF1744",       # 텍스트 색상
+            "background": "#FFFFFF",  # 배경색
+            "plot_bg": "rgba(255, 255, 255, 0.95)",
+            "grid": "rgba(200, 200, 200, 0.3)",
+            "text_color": "#353535"
+        },
+        "감소": {
+            "candle": "#29B6F6",     # 파란색 음봉
+            "avg_line": "#80D8FF",   # 하늘색 계열 이동평균선
+            "area": "rgba(41, 182, 246, 0.7)", # 면적 차트용 색상
+            "line": "#29B6F6",       # 선 차트용 색상
+            "text": "#0091EA",       # 텍스트 색상
+            "background": "#FFFFFF",  # 배경색
+            "plot_bg": "rgba(255, 255, 255, 0.95)",
+            "grid": "rgba(200, 200, 200, 0.3)",
+            "text_color": "#353535"
+        }
     },
-    "감소": {
-        "candle": "#29B6F6",     # 파란색 음봉
-        "avg_line": "#80D8FF",   # 하늘색 계열 이동평균선
-        "text": "#0091EA",       # 텍스트 색상
-        "background": "rgba(235, 245, 255, 0.4)"  # 배경색
-    },
-    "테마1": {
-        "primary": "#6200EA",    # 보라색
-        "secondary": "#B388FF",  # 연보라
-        "accent": "#D500F9"      # 자주색
-    },
-    "테마2": {
-        "primary": "#00BFA5",    # 청록색
-        "secondary": "#64FFDA",  # 연청록
-        "accent": "#00B0FF"      # 하늘색
-    },
-    "테마3": {
-        "primary": "#FF6D00",    # 주황색
-        "secondary": "#FFAB40",  # 연주황
-        "accent": "#FFFF00"      # 노랑색
-    },
-    "테마4": {
-        "primary": "#DD2C00",    # 다홍색
-        "secondary": "#FF5722",  # 주황색
-        "accent": "#FFAB00"      # 황금색
+    "dark": {
+        "증가": {
+            "candle": "#FF5252",     # 빨간색 양봉
+            "avg_line": "#FF9E80",   # 주황색 계열 이동평균선
+            "area": "rgba(255, 82, 82, 0.7)", # 면적 차트용 색상
+            "line": "#FF5252",       # 선 차트용 색상
+            "text": "#FF5252",       # 텍스트 색상
+            "background": "#1E1E1E",  # 배경색
+            "plot_bg": "rgba(30, 30, 30, 0.95)",
+            "grid": "rgba(70, 70, 70, 0.3)",
+            "text_color": "#FFFFFF"
+        },
+        "감소": {
+            "candle": "#29B6F6",     # 파란색 음봉
+            "avg_line": "#80D8FF",   # 하늘색 계열 이동평균선
+            "area": "rgba(41, 182, 246, 0.7)", # 면적 차트용 색상
+            "line": "#29B6F6",       # 선 차트용 색상
+            "text": "#29B6F6",       # 텍스트 색상
+            "background": "#1E1E1E",  # 배경색
+            "plot_bg": "rgba(30, 30, 30, 0.95)",
+            "grid": "rgba(70, 70, 70, 0.3)",
+            "text_color": "#FFFFFF"
+        }
     }
 }
 
@@ -733,83 +749,35 @@ def display_stock_recommendation(ticker):
     else:
         st.info("관련 종목을 찾을 수 없습니다.")
 
-# --- 개선된 알록달록 트레이드뷰 ---
+# --- 개선된 트레이더 뷰 (3x3 고정, 다크/라이트 모드만 지원) ---
 def display_trader_view(tickers_list, period='1mo'):
     st.markdown("### 🖥️ 트레이더 뷰: 다중 종목 모니터링")
     
-    # 보기 옵션
+    # 보기 옵션 (차트 스타일만 남기고 열 수 고정)
     col1, col2 = st.columns([3, 1])
+    
     with col1:
-        # 열 개수 선택 옵션
-        cols_per_row = st.radio("열 개수 선택", [2, 3, 4], horizontal=True, index=1)
-        
+        # 다크모드/라이트모드 선택
+        is_dark_mode = st.toggle("다크 모드", value=False)
+    
     with col2:
         # 차트 스타일 선택
         chart_style = st.selectbox(
             "차트 스타일", 
-            ["알록달록 캔들", "일본식 캔들", "면적 차트", "선 차트"]
+            ["캔들스틱", "선 차트", "면적 차트"]
         )
     
-    # 테마 선택 버튼
-    theme_col1, theme_col2, theme_col3, theme_col4 = st.columns(4)
-    with theme_col1:
-        theme1 = st.button("🌈 화려한 색상", use_container_width=True)
-    with theme_col2:
-        theme2 = st.button("🌊 시원한 색상", use_container_width=True)
-    with theme_col3:
-        theme3 = st.button("🔥 따뜻한 색상", use_container_width=True)
-    with theme_col4:
-        theme4 = st.button("🍃 자연 색상", use_container_width=True)
+    # 테마 설정 (다크/라이트 모드)
+    theme_mode = "dark" if is_dark_mode else "light"
     
-    # 선택된 테마에 따라 색상 설정
-    selected_colors = {
-        "증가": {
-            "candle": "#FF5252",  # 빨간색 양봉
-            "avg_line": "#FF9E80",  # 주황색 계열 이동평균선
-            "area": "rgba(255, 82, 82, 0.7)",  # 면적 차트용 색상
-        },
-        "감소": {
-            "candle": "#29B6F6",  # 파란색 음봉
-            "avg_line": "#80D8FF",  # 하늘색 계열 이동평균선
-            "area": "rgba(41, 182, 246, 0.7)",  # 면적 차트용 색상
-        }
-    }
+    # 고정 열 수 (3x3)
+    cols_per_row = 3
     
-    # 테마 선택에 따른 색상 변경
-    if theme1:  # 화려한 색상
-        selected_colors["증가"]["candle"] = "#FF1744"  # 진한 빨강
-        selected_colors["감소"]["candle"] = "#2979FF"  # 진한 파랑
-        selected_colors["증가"]["avg_line"] = "#D500F9"  # 자주색
-        selected_colors["감소"]["avg_line"] = "#00E5FF"  # 청록색
-        selected_colors["증가"]["area"] = "rgba(255, 23, 68, 0.7)"
-        selected_colors["감소"]["area"] = "rgba(41, 121, 255, 0.7)"
-        
-    elif theme2:  # 시원한 색상
-        selected_colors["증가"]["candle"] = "#00B0FF"  # 하늘
-        selected_colors["감소"]["candle"] = "#0091EA"  # 진한 하늘
-        selected_colors["증가"]["avg_line"] = "#64FFDA"  # 민트
-        selected_colors["감소"]["avg_line"] = "#00BFA5"  # 청록
-        selected_colors["증가"]["area"] = "rgba(0, 176, 255, 0.7)"
-        selected_colors["감소"]["area"] = "rgba(0, 145, 234, 0.7)"
-        
-    elif theme3:  # 따뜻한 색상
-        selected_colors["증가"]["candle"] = "#FF6D00"  # 주황
-        selected_colors["감소"]["candle"] = "#FFA000"  # 황금
-        selected_colors["증가"]["avg_line"] = "#FF3D00"  # 진한 주황
-        selected_colors["감소"]["avg_line"] = "#FF6E40"  # 연한 주황
-        selected_colors["증가"]["area"] = "rgba(255, 109, 0, 0.7)"
-        selected_colors["감소"]["area"] = "rgba(255, 160, 0, 0.7)"
-        
-    elif theme4:  # 자연 색상
-        selected_colors["증가"]["candle"] = "#43A047"  # 녹색
-        selected_colors["감소"]["candle"] = "#00897B"  # 청록
-        selected_colors["증가"]["avg_line"] = "#7CB342"  # 연두
-        selected_colors["감소"]["avg_line"] = "#009688"  # 청록
-        selected_colors["증가"]["area"] = "rgba(67, 160, 71, 0.7)"
-        selected_colors["감소"]["area"] = "rgba(0, 137, 123, 0.7)"
+    # 총 종목 수에 따라 필요한 종목 추출 (최대 9개)
+    tickers_to_show = tickers_list[:9]
+    total_tickers = len(tickers_to_show)
     
-    # 행 개수 계산
-    total_tickers = len(tickers_list)
+    # 필요한 행 수 계산
     rows_needed = (total_tickers + cols_per_row - 1) // cols_per_row
     
     # 각 행에 대해 처리
@@ -823,17 +791,12 @@ def display_trader_view(tickers_list, period='1mo'):
             
             # 인덱스 범위 체크
             if ticker_idx < total_tickers:
-                ticker, name = tickers_list[ticker_idx]
+                ticker, name = tickers_to_show[ticker_idx]
                 
                 with cols[col_idx]:
                     try:
                         df = fetch_stock_data(ticker, period)
                         if not df.empty:
-                            # 테마 색상 랜덤하게 선택 (다양성 증가)
-                            theme_keys = list(COLORFUL_THEMES.keys())
-                            theme_key = random.choice(theme_keys)
-                            theme = COLORFUL_THEMES[theme_key]
-                            
                             # 현재가 및 변동률 계산
                             latest = df['Close'].iloc[-1]
                             prev = df['Close'].iloc[-2] if len(df) > 1 else latest
@@ -842,13 +805,13 @@ def display_trader_view(tickers_list, period='1mo'):
                             
                             # 증가/감소에 따라 색상 선택
                             price_direction = "증가" if change >= 0 else "감소"
-                            color_set = selected_colors[price_direction]
+                            color_set = THEME_COLORS[theme_mode][price_direction]
                             
-                            # 차트 유형에 따라 다른 시각화
+                            # 차트 생성
                             fig = go.Figure()
                             
-                            if chart_style == "알록달록 캔들":
-                                # 캔들스틱 차트 (화려한 색상)
+                            if chart_style == "캔들스틱":
+                                # 캔들스틱 차트
                                 fig.add_trace(
                                     go.Candlestick(
                                         x=df.index,
@@ -858,34 +821,15 @@ def display_trader_view(tickers_list, period='1mo'):
                                         close=df['Close'],
                                         name="OHLC",
                                         showlegend=False,
-                                        increasing_line_color=color_set["candle"],
-                                        decreasing_line_color=color_set["candle"],
-                                        increasing_fillcolor=color_set["candle"],
-                                        decreasing_fillcolor=color_set["candle"],
-                                        line=dict(width=3),
-                                    )
-                                )
-                                
-                            elif chart_style == "일본식 캔들":
-                                # 전통적 캔들스틱 (빨강/파랑)
-                                fig.add_trace(
-                                    go.Candlestick(
-                                        x=df.index,
-                                        open=df['Open'],
-                                        high=df['High'],
-                                        low=df['Low'],
-                                        close=df['Close'],
-                                        name="OHLC",
-                                        showlegend=False,
-                                        increasing_line_color='#FF5252',
-                                        decreasing_line_color='#29B6F6',
-                                        increasing_fillcolor='rgba(255, 82, 82, 0.8)',
-                                        decreasing_fillcolor='rgba(41, 182, 246, 0.8)',
+                                        increasing_line_color=THEME_COLORS[theme_mode]["증가"]["candle"],
+                                        decreasing_line_color=THEME_COLORS[theme_mode]["감소"]["candle"],
+                                        increasing_fillcolor=THEME_COLORS[theme_mode]["증가"]["candle"],
+                                        decreasing_fillcolor=THEME_COLORS[theme_mode]["감소"]["candle"]
                                     )
                                 )
                                 
                             elif chart_style == "면적 차트":
-                                # 면적 차트 (그라데이션 효과)
+                                # 면적 차트
                                 fig.add_trace(
                                     go.Scatter(
                                         x=df.index,
@@ -898,17 +842,17 @@ def display_trader_view(tickers_list, period='1mo'):
                                 )
                                 
                             else:  # 선 차트
-                                # 선 차트 (간단 시각화)
+                                # 선 차트
                                 fig.add_trace(
                                     go.Scatter(
                                         x=df.index,
                                         y=df['Close'],
                                         name="주가",
-                                        line=dict(color=color_set["candle"], width=3)
+                                        line=dict(color=color_set["line"], width=2)
                                     )
                                 )
                             
-                            # 20일 이동평균선 (모든 차트 유형에 추가)
+                            # 20일 이동평균선 추가
                             if len(df) >= 20:
                                 ma20 = df['Close'].rolling(window=20).mean()
                                 fig.add_trace(
@@ -916,56 +860,39 @@ def display_trader_view(tickers_list, period='1mo'):
                                         x=df.index, 
                                         y=ma20, 
                                         name="MA20",
-                                        line=dict(color=color_set["avg_line"], width=2, dash='dot'),
+                                        line=dict(color=color_set["avg_line"], width=1.5, dash='dot'),
                                         showlegend=False
                                     )
                                 )
                             
-                            # 차트 레이아웃 설정
-                            card_bg_color = 'rgba(245, 245, 245, 0.8)'  # 카드 배경색
-                            border_color = color_set["candle"]  # 테두리 색상
-                            
-                            # 레이아웃 컴팩트하게 설정 (더 예쁜 디자인)
+                            # 레이아웃 설정 (테마에 따라 다르게)
                             fig.update_layout(
                                 title=dict(
                                     text=f"{name} ({ticker})",
-                                    font=dict(size=16, family="Arial", color="#353535"),
+                                    font=dict(size=16, family="Arial", color=color_set["text_color"]),
                                     x=0.5,
                                     y=0.98,
                                     xanchor='center',
                                     yanchor='top'
                                 ),
-                                height=320,  # 조금 더 큰 높이
+                                height=250,  # 3x3 그리드에 맞게 높이 조정
                                 margin=dict(l=0, r=0, t=30, b=0),
                                 xaxis_rangeslider_visible=False,
                                 xaxis=dict(
                                     showgrid=False,
                                     showticklabels=True,
-                                    linecolor='rgba(200, 200, 200, 0.7)',
+                                    linecolor=color_set["grid"],
+                                    color=color_set["text_color"]
                                 ),
                                 yaxis=dict(
                                     showgrid=True,
-                                    gridcolor='rgba(200, 200, 200, 0.3)',
+                                    gridcolor=color_set["grid"],
                                     showticklabels=True,
                                     tickformat=",.0f",
+                                    color=color_set["text_color"]
                                 ),
-                                plot_bgcolor='rgba(255, 255, 255, 0.95)',  # 플롯 배경색
-                                paper_bgcolor=card_bg_color,  # 카드 배경색
-                                shapes=[
-                                    # 카드 테두리 효과
-                                    dict(
-                                        type="rect",
-                                        xref="paper", yref="paper",
-                                        x0=0, y0=0, x1=1, y1=1,
-                                        line=dict(color=border_color, width=3),
-                                        fillcolor="rgba(0, 0, 0, 0)",
-                                    )
-                                ],
-                                hoverlabel=dict(
-                                    bgcolor="white",
-                                    font_size=14,
-                                    font_family="Arial"
-                                ),
+                                plot_bgcolor=color_set["plot_bg"],
+                                paper_bgcolor=color_set["background"]
                             )
                             
                             # Y축 표시 형식 설정
@@ -974,27 +901,16 @@ def display_trader_view(tickers_list, period='1mo'):
                             # 차트 표시 (테마 없이 원본 색상 유지)
                             st.plotly_chart(fig, theme=None, use_container_width=True)
                             
-                            # 가격과 변동률 표시 (심플하게)
-                            if price_direction == "증가":
-                                price_color = "#FF1744"  # 빨간색 (증가)
-                                icon = "📈"
-                            else:
-                                price_color = "#0091EA"  # 파란색 (감소)
-                                icon = "📉"
-                                
-                            # 가격과 변동률을 화려하게 표시
+                            # 가격과 변동률 표시
                             st.markdown(
-                                f"""
-                                <div style="background-color: {card_bg_color}; padding: 10px; border-radius: 5px; 
-                                    border-left: 5px solid {price_color}; text-align: center; margin-top: -30px;">
-                                    <h1 style="font-size: 22px; margin: 0; color: {price_color};">
-                                        {icon} {latest:,.2f}
-                                    </h1>
-                                    <p style="font-size: 16px; margin: 5px 0 0 0; color: {price_color};">
-                                        {change:+,.2f} ({pct:+.2f}%)
-                                    </p>
-                                </div>
-                                """, 
+                                f"""<div style="text-align: center;">
+                                   <span style="font-size: 18px; font-weight: bold; color: {color_set["text"]};">
+                                      {"📈" if change >= 0 else "📉"} {latest:,.2f}
+                                   </span><br>
+                                   <span style="color: {color_set["text"]};">
+                                      {change:+,.2f} ({pct:+.2f}%)
+                                   </span>
+                                </div>""", 
                                 unsafe_allow_html=True
                             )
                             
@@ -1012,9 +928,9 @@ def get_llm_response(query):
         openai_api_key=OPENAI_API_KEY,
         model_name="gpt-4",  # 모델을 GPT-4로 고정
         temperature=0.3,
-        max_tokens=st.session_state.max_tokens,
-        frequency_penalty=st.session_state.frequency_penalty,
-        presence_penalty=st.session_state.presence_penalty
+        max_tokens=1000,
+        frequency_penalty=0,
+        presence_penalty=0
     )
     
     # 한국어 응답 유도
@@ -1047,9 +963,6 @@ def render_stock_search():
             ('005380.KS', '현대차'),
             ('000270.KS', '기아'),
             ('068270.KS', '셀트리온'),
-            ('373220.KS', 'LG에너지솔루션'),
-            ('006400.KS', '삼성SDI'),
-            ('055550.KS', '신한지주')
         ]
         display_trader_view(popular_kr)
         
@@ -1065,19 +978,16 @@ def render_stock_search():
             ('NVDA', 'NVIDIA'),
             ('JPM', 'JPMorgan'),
             ('V', 'Visa'),
-            ('WMT', 'Walmart'),
-            ('JNJ', 'Johnson & Johnson'),
-            ('PG', 'Procter & Gamble')
         ]
         display_trader_view(popular_us)
         
     # 커스텀 종목 추가 옵션
     with st.expander("커스텀 종목 모니터링"):
-        custom_input = st.text_input("종목 티커를 쉼표로 구분하여 입력하세요 (예: AAPL,MSFT,GOOGL 또는 005930.KS,035420.KS)", 
-                                      placeholder="AAPL,MSFT,GOOGL 또는 005930.KS,035420.KS")
+        custom_input = st.text_input("종목 티커를 쉼표로 구분하여 입력하세요 (최대 9개 표시)", 
+                                     placeholder="AAPL,MSFT,GOOGL 또는 005930.KS,035420.KS")
         
         if custom_input:
-            custom_tickers = [ticker.strip() for ticker in custom_input.split(',')]
+            custom_tickers = [ticker.strip() for ticker in custom_input.split(',')][:9]  # 최대 9개로 제한
             custom_ticker_info = []
             
             for ticker in custom_tickers:

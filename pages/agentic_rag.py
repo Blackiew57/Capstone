@@ -19,6 +19,8 @@ from plotly.subplots import make_subplots
 from io import StringIO
 import numpy as np
 import functools
+import threading
+import concurrent.futures
 
 # 환경 변수 로드
 load_dotenv()
@@ -57,23 +59,23 @@ def apply_chart_style(fig, title=None, height=450):
                 'font': {'size': 24, 'family': 'Arial', 'color': '#353535'}
             },
             height=height,
-            font=dict(family="Arial, sans-serif", size=14, color="#353535"),  # 글자색 어둡게
+            font=dict(family="Arial, sans-serif", size=14, color="#353535"),
             xaxis=dict(
                 showgrid=True, 
                 gridwidth=0.5, 
-                gridcolor='rgba(200,200,200,0.8)',  # 그리드 더 진하게
+                gridcolor='rgba(200,200,200,0.8)',
                 showticklabels=True,
-                title_font=dict(color="#353535")  # 축 제목 색상
+                title_font=dict(color="#353535")
             ),
             yaxis=dict(
                 showgrid=True, 
                 gridwidth=0.5, 
-                gridcolor='rgba(200,200,200,0.8)',  # 그리드 더 진하게 
+                gridcolor='rgba(200,200,200,0.8)',
                 showticklabels=True,
-                title_font=dict(color="#353535")  # 축 제목 색상
+                title_font=dict(color="#353535")
             ),
-            plot_bgcolor='rgba(245,245,245,0.9)',  # 배경색 약간 회색으로
-            paper_bgcolor='rgba(245,245,245,0.9)',  # 배경색 약간 회색으로
+            plot_bgcolor='rgba(245,245,245,0.9)',
+            paper_bgcolor='rgba(245,245,245,0.9)',
             margin=dict(l=20, r=20, t=70, b=20),
             legend=dict(
                 orientation="h",
@@ -81,8 +83,8 @@ def apply_chart_style(fig, title=None, height=450):
                 y=-0.2,
                 xanchor="center",
                 x=0.5,
-                bgcolor='rgba(255,255,255,0.9)',  # 범례 배경
-                font=dict(color="#353535")  # 범례 글자색
+                bgcolor='rgba(255,255,255,0.9)',
+                font=dict(color="#353535")
             )
         )
     return fig
@@ -90,9 +92,13 @@ def apply_chart_style(fig, title=None, height=450):
 # --- 주식 데이터 캐싱 함수 ---
 @functools.lru_cache(maxsize=32)
 def get_stock_data(ticker, period='1y'):
-    info = yf.Ticker(ticker).info
-    history = yf.Ticker(ticker).history(period=period)
-    return info, history
+    try:
+        info = yf.Ticker(ticker).info
+        history = yf.Ticker(ticker).history(period=period)
+        return info, history
+    except Exception as e:
+        st.warning(f"티커 '{ticker}' 데이터 로드 실패: {e}")
+        return {}, pd.DataFrame()
 
 # --- 고급 주식 차트 시각화 ---
 def plot_advanced_stock_chart(ticker):
@@ -364,119 +370,433 @@ def plot_portfolio_interactive(df):
     else:
         weight_col = weight_cols[0]
     
-    # 1. 종목별 비중 도넛 차트 (화려한 색상)
-    st.subheader("종목별 포트폴리오 구성")
-    sorted_df = df.sort_values(by=weight_col, ascending=False).reset_index(drop=True)
+    # 탭 인터페이스로 다양한 시각화 구성
+    tabs = st.tabs(["포트폴리오 구성", "위험-수익 분석", "상관관계", "미래 시뮬레이션", "지역 분포"])
     
-    fig1 = px.pie(
-        sorted_df, 
-        values=weight_col, 
-        names=ticker_col, 
-        title="종목별 비중",
-        hole=0.4,
-        color_discrete_sequence=COLOR_PALETTES['vivid']
-    )
-    
-    # 텍스트 가독성 개선
-    fig1.update_traces(
-        textposition='inside', 
-        textinfo='percent+label',
-        textfont=dict(size=14, color='black'),  # 글자색 검정으로 변경
-        insidetextfont=dict(color='white'),     # 내부 텍스트는 흰색으로
-        outsidetextfont=dict(color='black'),    # 외부 텍스트는 검정으로
-        hovertemplate='<b>%{label}</b><br>비중: %{percent:.1%}<br>값: %{value:.1f}%'
-    )
-    
-    apply_chart_style(fig1, "🔮 종목별 투자 비중")
-    # 테마 없이 원본 색상 유지
-    st.plotly_chart(fig1, theme=None, use_container_width=True)
-    
-    # 2. 국가별 비중 바차트 (있는 경우)
-    country_cols = [c for c in df.columns if any(keyword in c.lower() for keyword in ['country', '국가', 'region'])]
-    if country_cols:
-        country_col = country_cols[0]
-        country_df = df.groupby(country_col)[weight_col].sum().sort_values(ascending=False).reset_index()
+    with tabs[0]:
+        # 1. 종목별 비중 도넛 차트 (기존 시각화)
+        st.subheader("종목별 포트폴리오 구성")
+        sorted_df = df.sort_values(by=weight_col, ascending=False).reset_index(drop=True)
         
-        fig2 = px.bar(
-            country_df,
-            x=country_col,
-            y=weight_col,
-            title="국가별 비중",
-            text=weight_col,
-            color=country_col,
-            color_discrete_sequence=COLOR_PALETTES['dark']
+        fig1 = px.pie(
+            sorted_df, 
+            values=weight_col, 
+            names=ticker_col, 
+            title="종목별 비중",
+            hole=0.4,
+            color_discrete_sequence=COLOR_PALETTES['vivid']
         )
         
-        # 텍스트 가독성 개선
-        fig2.update_traces(
-            texttemplate='%{text:.1f}%',
+        fig1.update_traces(
+            textposition='inside', 
+            textinfo='percent+label',
+            textfont=dict(size=14, color='black'),
+            insidetextfont=dict(color='white'),
+            outsidetextfont=dict(color='black'),
+            hovertemplate='<b>%{label}</b><br>비중: %{percent:.1%}<br>값: %{value:.1f}%'
+        )
+        
+        apply_chart_style(fig1, "🔮 종목별 투자 비중")
+        st.plotly_chart(fig1, theme=None, use_container_width=True)
+        
+        # 국가별/업종별 비중 (기존 코드)
+        country_cols = [c for c in df.columns if any(keyword in c.lower() for keyword in ['country', '국가', 'region'])]
+        if country_cols:
+            country_col = country_cols[0]
+            country_df = df.groupby(country_col)[weight_col].sum().sort_values(ascending=False).reset_index()
+            
+            fig2 = px.bar(
+                country_df,
+                x=country_col,
+                y=weight_col,
+                title="국가별 비중",
+                text=weight_col,
+                color=country_col,
+                color_discrete_sequence=COLOR_PALETTES['dark']
+            )
+            
+            fig2.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                textfont=dict(size=14, color='black'),
+                hovertemplate='<b>%{x}</b><br>비중: %{y:.1f}%'
+            )
+            
+            apply_chart_style(fig2, "🌏 국가별 투자 비중")
+            st.plotly_chart(fig2, theme=None, use_container_width=True)
+            
+        industry_cols = [c for c in df.columns if any(keyword in c.lower() for keyword in ['industry', '업종', 'sector'])]
+        if industry_cols:
+            industry_col = industry_cols[0]
+            industry_df = df.groupby(industry_col)[weight_col].sum().sort_values(ascending=False).reset_index()
+            
+            # 업종별 바차트
+            fig3 = px.bar(
+                industry_df,
+                x=industry_col,
+                y=weight_col,
+                title="업종별 비중",
+                text=weight_col,
+                color=industry_col,
+                color_discrete_sequence=COLOR_PALETTES['vibrant']
+            )
+            
+            fig3.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                textfont=dict(size=14, color='black'),
+                hovertemplate='<b>%{x}</b><br>비중: %{y:.1f}%'
+            )
+            
+            apply_chart_style(fig3, "🏭 업종별 투자 비중")
+            st.plotly_chart(fig3, theme=None, use_container_width=True)
+            
+            # 업종별 트리맵
+            fig_tree = px.treemap(
+                df,
+                path=[industry_col, ticker_col],
+                values=weight_col,
+                color=weight_col,
+                color_continuous_scale='Viridis',
+                hover_data=[weight_col],
+                color_continuous_midpoint=df[weight_col].median()
+            )
+            
+            fig_tree.update_traces(
+                textfont=dict(size=14, color='white'),
+                textposition='middle center',
+                hovertemplate='<b>%{label}</b><br>비중: %{value:.1f}%'
+            )
+            
+            fig_tree.update_layout(
+                treemapcolorway=px.colors.qualitative.Bold,
+                coloraxis_showscale=True,
+                margin=dict(t=50, l=25, r=25, b=25)
+            )
+            
+            apply_chart_style(fig_tree, "🌳 업종-종목 투자 트리맵", height=500)
+            st.plotly_chart(fig_tree, theme=None, use_container_width=True)
+    
+    with tabs[1]:
+        # 2. 위험-수익 산점도 (새로운 시각화)
+        st.subheader("위험-수익 분석")
+        
+        # 가상의 다른 포트폴리오 데이터 (비교용)
+        portfolios = {
+            "추천 포트폴리오": {"수익률": 8.5, "위험": 12.3, "샤프비율": 0.69},
+            "안정형": {"수익률": 5.2, "위험": 8.1, "샤프비율": 0.64},
+            "균형형": {"수익률": 7.4, "위험": 10.8, "샤프비율": 0.68},
+            "공격형": {"수익률": 10.1, "위험": 15.6, "샤프비율": 0.65},
+            "S&P 500": {"수익률": 9.8, "위험": 16.2, "샤프비율": 0.60},
+            "KOSPI": {"수익률": 7.2, "위험": 14.8, "샤프비율": 0.49},
+        }
+        
+        # 데이터프레임 생성
+        risk_return_df = pd.DataFrame([
+            {"포트폴리오": name, "예상 연간 수익률(%)": data["수익률"], "연간 변동성(%)": data["위험"], "샤프비율": data["샤프비율"]}
+            for name, data in portfolios.items()
+        ])
+        
+        # 샤프비율에 따른 버블 크기 설정
+        risk_return_df["버블 크기"] = risk_return_df["샤프비율"] * 50
+        
+        # 위험-수익 산점도
+        fig_risk = px.scatter(
+            risk_return_df,
+            x="연간 변동성(%)",
+            y="예상 연간 수익률(%)",
+            size="버블 크기",
+            color="포트폴리오",
+            text="포트폴리오",
+            color_discrete_sequence=COLOR_PALETTES['vivid'],
+            title="포트폴리오 위험-수익 비교"
+        )
+        
+        fig_risk.update_traces(
+            textposition='top center',
+            marker=dict(opacity=0.8, line=dict(width=2, color='white')),
+            hovertemplate='<b>%{text}</b><br>수익률: %{y:.1f}%<br>변동성: %{x:.1f}%<br>샤프비율: %{customdata[0]:.2f}'
+        )
+        
+        fig_risk.update_traces(customdata=risk_return_df[['샤프비율']])
+        
+        apply_chart_style(fig_risk, "📊 포트폴리오 효율성 분석")
+        st.plotly_chart(fig_risk, theme=None, use_container_width=True)
+        
+        # 샤프비율 비교 바차트
+        fig_sharpe = px.bar(
+            risk_return_df.sort_values(by="샤프비율", ascending=False),
+            x="포트폴리오",
+            y="샤프비율",
+            color="포트폴리오",
+            color_discrete_sequence=COLOR_PALETTES['dark'],
+            title="포트폴리오 샤프비율 비교",
+            text="샤프비율"
+        )
+        
+        fig_sharpe.update_traces(
+            texttemplate='%{text:.2f}',
             textposition='outside',
-            textfont=dict(size=14, color='black'),  # 글자색 검정으로
-            hovertemplate='<b>%{x}</b><br>비중: %{y:.1f}%'
+            hovertemplate='<b>%{x}</b><br>샤프비율: %{y:.2f}'
         )
         
-        apply_chart_style(fig2, "🌏 국가별 투자 비중")
-        # 테마 없이 원본 색상 유지
-        st.plotly_chart(fig2, theme=None, use_container_width=True)
+        apply_chart_style(fig_sharpe, "📈 위험 조정 수익률 비교")
+        st.plotly_chart(fig_sharpe, theme=None, use_container_width=True)
     
-    # 3. 업종별 비중 바차트 (있는 경우)
-    industry_cols = [c for c in df.columns if any(keyword in c.lower() for keyword in ['industry', '업종', 'sector'])]
-    if industry_cols:
-        industry_col = industry_cols[0]
-        industry_df = df.groupby(industry_col)[weight_col].sum().sort_values(ascending=False).reset_index()
+    with tabs[2]:
+        # 3. 자산 상관관계 히트맵 (새로운 시각화)
+        st.subheader("자산 상관관계 분석")
         
-        # 3.1 업종별 바차트
-        fig3 = px.bar(
-            industry_df,
-            x=industry_col,
-            y=weight_col,
-            title="업종별 비중",
-            text=weight_col,
-            color=industry_col,
-            color_discrete_sequence=COLOR_PALETTES['vibrant']
+        # 샘플 종목 리스트 (상위 8개 종목 또는 전체)
+        top_stocks = sorted_df.head(min(8, len(sorted_df)))[ticker_col].tolist()
+        
+        # 가상의 상관관계 데이터 생성
+        np.random.seed(42)  # 재현 가능한 결과를 위한 시드 설정
+        num_stocks = len(top_stocks)
+        corr_matrix = np.eye(num_stocks)  # 대각선은 1로 설정 (자기 자신과의 상관관계)
+        
+        # 상관관계 행렬 채우기 (대칭행렬)
+        for i in range(num_stocks):
+            for j in range(i+1, num_stocks):
+                # -0.3에서 0.9 사이의 상관계수 생성
+                corr = np.random.uniform(-0.3, 0.9)
+                corr_matrix[i, j] = corr
+                corr_matrix[j, i] = corr  # 대칭 설정
+        
+        # 데이터프레임으로 변환
+        corr_df = pd.DataFrame(corr_matrix, index=top_stocks, columns=top_stocks)
+        
+        # 히트맵 생성
+        fig_corr = px.imshow(
+            corr_df,
+            text_auto='.2f',
+            color_continuous_scale='RdBu_r',  # 빨강(-) 흰색(0) 파랑(+) 스케일
+            zmin=-1, zmax=1,  # 상관관계 범위 -1에서 1로 고정
+            title="자산 간 상관관계 히트맵"
         )
         
-        # 텍스트 가독성 개선
-        fig3.update_traces(
-            texttemplate='%{text:.1f}%',
-            textposition='outside',
-            textfont=dict(size=14, color='black'),  # 글자색 검정으로
-            hovertemplate='<b>%{x}</b><br>비중: %{y:.1f}%'
+        fig_corr.update_layout(
+            height=500,
+            xaxis_title="",
+            yaxis_title="",
+            coloraxis_colorbar=dict(
+                title="상관계수",
+                tickvals=[-1, -0.5, 0, 0.5, 1],
+                ticktext=["-1.0", "-0.5", "0.0", "0.5", "1.0"]
+            )
         )
         
-        apply_chart_style(fig3, "🏭 업종별 투자 비중")
-        # 테마 없이 원본 색상 유지
-        st.plotly_chart(fig3, theme=None, use_container_width=True)
+        apply_chart_style(fig_corr, "🔄 자산 상관관계 분석")
+        st.plotly_chart(fig_corr, theme=None, use_container_width=True)
         
-        # 3.2 업종별 트리맵 (색상 개선)
-        fig_tree = px.treemap(
-            df,
-            path=[industry_col, ticker_col],
-            values=weight_col,
-            color=weight_col,
-            # 더 선명하고 대비가 강한 색상 스케일로 변경
-            color_continuous_scale='Viridis',  # RdBu에서 Viridis로 변경
-            hover_data=[weight_col],
-            color_continuous_midpoint=df[weight_col].median()  # 중간값 기준으로 색상 분포
+        # 상관관계 해석 설명 추가
+        st.markdown("""
+        ### 상관관계 해석
+        - **양의 상관관계(0~1)**: 두 자산의 가격이 같은 방향으로 움직이는 경향이 있습니다.
+        - **음의 상관관계(-1~0)**: 두 자산의 가격이 반대 방향으로 움직이는 경향이 있습니다.
+        - **낮은 상관관계**: 서로 다른 움직임을 보이는 자산들은 분산투자 효과를 높여줍니다.
+        """)
+    
+    with tabs[3]:
+        # 4. 미래 수익률 시뮬레이션 (몬테카를로) (새로운 시각화)
+        st.subheader("포트폴리오 미래 수익률 시뮬레이션")
+        
+        # 시뮬레이션 설정
+        initial_investment = 10000  # 초기 투자금 ($10,000)
+        years = 10  # 10년 시뮬레이션
+        simulations = 500  # 시뮬레이션 횟수
+        
+        # 포트폴리오 연간 수익률 및 변동성 (가정)
+        annual_return = 0.08  # 8% 기대 수익률
+        annual_volatility = 0.12  # 12% 표준편차
+        
+        # 시간 경과에 따른 투자 가치 시뮬레이션
+        np.random.seed(42)
+        simulation_df = pd.DataFrame()
+        
+        for i in range(simulations):
+            # 각 연도별 수익률 시뮬레이션
+            returns = np.random.normal(annual_return, annual_volatility, years)
+            # 복리 수익 계산
+            values = [initial_investment]
+            for r in returns:
+                values.append(values[-1] * (1 + r))
+            
+            simulation_df[f'sim_{i}'] = values
+        
+        # 시간 축 생성
+        simulation_df['year'] = range(years + 1)
+        
+        # 중앙값, 상위 10%, 하위 10% 계산
+        median_values = simulation_df.drop('year', axis=1).median(axis=1)
+        upper_10 = simulation_df.drop('year', axis=1).quantile(0.9, axis=1)
+        lower_10 = simulation_df.drop('year', axis=1).quantile(0.1, axis=1)
+        
+        # 100개의 랜덤 시뮬레이션 선택 (모든 선 표시하면 너무 복잡함)
+        random_sims = np.random.choice(simulations, 100, replace=False)
+        
+        # 시뮬레이션 플롯 생성
+        fig_sim = go.Figure()
+        
+        # 랜덤 시뮬레이션 경로 추가
+        for i in random_sims:
+            fig_sim.add_trace(
+                go.Scatter(
+                    x=simulation_df['year'],
+                    y=simulation_df[f'sim_{i}'],
+                    mode='lines',
+                    line=dict(color='rgba(200, 200, 200, 0.2)'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                )
+            )
+        
+        # 중앙값, 상위 10%, 하위 10% 추가
+        fig_sim.add_trace(
+            go.Scatter(
+                x=simulation_df['year'],
+                y=median_values,
+                mode='lines',
+                line=dict(color='blue', width=3),
+                name='중앙값',
+                hovertemplate='연도: %{x}<br>가치: $%{y:.0f}'
+            )
         )
         
-        # 텍스트 가독성 개선
-        fig_tree.update_traces(
-            textfont=dict(size=14, color='white'),  # 텍스트 색상을 흰색으로 변경
-            textposition='middle center',
-            hovertemplate='<b>%{label}</b><br>비중: %{value:.1f}%'
+        fig_sim.add_trace(
+            go.Scatter(
+                x=simulation_df['year'],
+                y=upper_10,
+                mode='lines',
+                line=dict(color='green', width=2),
+                name='상위 10%',
+                hovertemplate='연도: %{x}<br>가치: $%{y:.0f}'
+            )
         )
         
-        # 모서리 둥글게 및 명암 강화
-        fig_tree.update_layout(
-            treemapcolorway=px.colors.qualitative.Bold,  # 더 선명한 색상
-            coloraxis_showscale=True,
-            margin=dict(t=50, l=25, r=25, b=25)
+        fig_sim.add_trace(
+            go.Scatter(
+                x=simulation_df['year'],
+                y=lower_10,
+                mode='lines',
+                line=dict(color='red', width=2),
+                name='하위 10%',
+                hovertemplate='연도: %{x}<br>가치: $%{y:.0f}'
+            )
         )
         
-        apply_chart_style(fig_tree, "🌳 업종-종목 투자 트리맵", height=500)
-        # 테마 없이 원본 색상 유지
-        st.plotly_chart(fig_tree, theme=None, use_container_width=True)
+        fig_sim.update_layout(
+            title='10년 포트폴리오 가치 시뮬레이션',
+            xaxis_title='연도',
+            yaxis_title='포트폴리오 가치 ($)',
+            yaxis_tickprefix='$',
+            yaxis_tickformat=',',
+            hovermode='x unified'
+        )
+        
+        apply_chart_style(fig_sim, "🔮 포트폴리오 미래 가치 시뮬레이션", height=500)
+        st.plotly_chart(fig_sim, theme=None, use_container_width=True)
+        
+        # 최종 투자 결과 분포
+        final_values = simulation_df.iloc[-1].drop('year')
+        
+        # 히스토그램
+        fig_hist = px.histogram(
+            final_values,
+            nbins=30,
+            title="10년 후 투자 결과 분포",
+            color_discrete_sequence=['rgba(0, 128, 255, 0.7)']
+        )
+        
+        fig_hist.add_vline(
+            x=median_values.iloc[-1],
+            line_dash="dash",
+            line_color="blue",
+            annotation_text=f"중앙값: ${median_values.iloc[-1]:.0f}",
+            annotation_position="top right"
+        )
+        
+        fig_hist.update_layout(
+            xaxis_title="포트폴리오 가치 ($)",
+            yaxis_title="시뮬레이션 횟수",
+            xaxis_tickprefix='$',
+            xaxis_tickformat=',',
+            showlegend=False
+        )
+        
+        apply_chart_style(fig_hist, "📊 10년 후 포트폴리오 가치 분포")
+        st.plotly_chart(fig_hist, theme=None, use_container_width=True)
+    
+    with tabs[4]:
+        # 5. 지역별 분포 지도 (새로운 시각화)
+        st.subheader("글로벌 투자 분포")
+        
+        # 국가별 비중 데이터 (국가 정보가 있는 경우)
+        if 'country_col' in locals() and country_col:
+            country_data = df.groupby(country_col)[weight_col].sum().reset_index()
+            
+            # 국가 영문명으로 변환 (한글 국가명인 경우)
+            country_mapping = {
+                "한국": "South Korea", "미국": "United States", "중국": "China", "일본": "Japan",
+                "영국": "United Kingdom", "독일": "Germany", "프랑스": "France", "인도": "India",
+                "브라질": "Brazil", "캐나다": "Canada", "호주": "Australia", "러시아": "Russia"
+            }
+            
+            country_data[country_col] = country_data[country_col].map(
+                lambda x: country_mapping.get(x, x)
+            )
+            
+            # 지도 시각화
+            fig_map = px.choropleth(
+                country_data,
+                locations=country_col,
+                locationmode="country names",
+                color=weight_col,
+                hover_name=country_col,
+                color_continuous_scale="Viridis",
+                title="글로벌 지역별 투자 비중",
+                projection="natural earth"
+            )
+            
+            fig_map.update_layout(
+                height=550,
+                coloraxis_colorbar=dict(title="투자 비중 (%)")
+            )
+            
+            apply_chart_style(fig_map, "🌎 글로벌 투자 분포")
+            st.plotly_chart(fig_map, theme=None, use_container_width=True)
+        else:
+            # 국가 정보가 없는 경우 가상 데이터로 지도 표시
+            st.warning("포트폴리오에 국가 정보가 포함되어 있지 않아 샘플 데이터로 지도를 표시합니다.")
+            
+            sample_countries = {
+                "United States": 45, "South Korea": 20, "China": 10, "Japan": 5,
+                "Germany": 5, "United Kingdom": 5, "India": 5, "Brazil": 5
+            }
+            
+            country_data = pd.DataFrame([
+                {"country": country, "weight": weight}
+                for country, weight in sample_countries.items()
+            ])
+            
+            fig_map = px.choropleth(
+                country_data,
+                locations="country",
+                locationmode="country names",
+                color="weight",
+                hover_name="country",
+                color_continuous_scale="Viridis",
+                title="샘플 글로벌 투자 분포",
+                projection="natural earth"
+            )
+            
+            fig_map.update_layout(
+                height=550,
+                coloraxis_colorbar=dict(title="투자 비중 (%)")
+            )
+            
+            apply_chart_style(fig_map, "🌎 샘플 글로벌 투자 분포")
+            st.plotly_chart(fig_map, theme=None, use_container_width=True)
 
 def render_agentic_rag_tab():
     st.header("맞춤형 포트폴리오 추천")
@@ -486,7 +806,7 @@ def render_agentic_rag_tab():
     vectorstore = load_predefined_documents()
 
     # LLM 초기화
-    llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model_name="gpt-3.5-turbo-16k", temperature=0.3)
+    llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model_name="gpt-4", temperature=0.3)
     llm_gpt4 = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model_name="gpt-4", temperature=0.3)
 
     # Tool 정의 (영문명 필수)
