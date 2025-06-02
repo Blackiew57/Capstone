@@ -33,6 +33,8 @@ with st.sidebar:
     st.slider("Max Tokens",100,4000,1000,100, key="max_tokens")
     st.slider("Freq Penalty",-2.0,2.0,0.0,0.1, key="frequency_penalty")
     st.slider("Pres Penalty",-2.0,2.0,0.0,0.1, key="presence_penalty")
+    
+    # haha what's goin on
 
 st.title("🤖 AI 금융 어시스턴트")
 tab1, tab2, tab3 = st.tabs(["📈 주식 정보","📄 문서 분석", "📊 포트폴리오 추천"])
